@@ -6,6 +6,13 @@
 #include <lauxlib.h>
 extern void push_flags_table (lua_State *L);
 
+#if LUA_VERSION_NUM < 502
+  #define ALG_ENVIRONINDEX LUA_ENVIRONINDEX
+#else
+  #define lua_objlen lua_rawlen
+  #define ALG_ENVIRONINDEX lua_upvalueindex(1)
+#endif
+
 #ifndef __cplusplus
 # define bool int
 # define false 0
@@ -39,7 +46,7 @@ static bool get_env_flag (lua_State *L, int stack_pos, int *trg)
   else if (type == LUA_TNONE || type == LUA_TNIL)
     return true;
   if (type == LUA_TSTRING) {
-    lua_getfield (L, LUA_ENVIRONINDEX, lua_tostring(L, stack_pos));
+    lua_getfield (L, ALG_ENVIRONINDEX, lua_tostring(L, stack_pos));
     if (lua_isnumber(L, -1)) {
       *trg = lua_tointeger (L, -1);
       lua_pop (L, 1);
@@ -102,7 +109,7 @@ static int CheckFlags(lua_State* L, int stackpos)
 
 static int f_GetFlags (lua_State *L)
 {
-  lua_pushvalue (L, LUA_ENVIRONINDEX);
+  lua_pushvalue (L, ALG_ENVIRONINDEX);
   return 1;
 }
 
@@ -774,7 +781,7 @@ static int f_WriteConsoleOutputCharacter (lua_State *L)
   return 1;
 }
 
-static const struct luaL_reg cons_methods [] = {
+static const luaL_Reg cons_methods [] = {
   {"__tostring",                     consolehandle_tostring},
   {"__gc",                           consolehandle_gc},
   {"close",                          consolehandle_close},
@@ -809,7 +816,7 @@ static const struct luaL_reg cons_methods [] = {
   {NULL, NULL}
 };
 
-static const struct luaL_reg cons_functions[] = {
+static const luaL_Reg cons_functions[] = {
   {"AllocConsole",                   f_AllocConsole},
   {"CreateConsoleScreenBuffer",      f_CreateConsoleScreenBuffer},
   {"FreeConsole",                    f_FreeConsole},
@@ -828,21 +835,32 @@ static const struct luaL_reg cons_functions[] = {
   {NULL, NULL}
 };
 
-static void CreateType (lua_State *L, const char *name, const luaL_reg *methods)
+static void CreateType (lua_State *L, const char *name, const luaL_Reg *methods)
 {
   luaL_newmetatable(L, name);
-  lua_pushliteral(L, "__index");
-  lua_pushvalue(L, -2);
-  lua_rawset(L, -3);
+  lua_pushvalue(L, -1);
+  lua_setfield(L, -2, "__index");
+#if LUA_VERSION_NUM == 501
   luaL_register(L, NULL, methods);
+#else
+  lua_pushvalue(L, -2);
+  luaL_setfuncs(L, methods, 1);
+#endif
   lua_pop(L, 1);
 }
 
 int luaopen_cons (lua_State *L)
 {
   push_flags_table (L);
+#if LUA_VERSION_NUM == 501
   lua_replace (L, LUA_ENVIRONINDEX);
   CreateType(L, ConsoleHandleType, cons_methods);
   luaL_register(L, "cons", cons_functions);
+#else
+  CreateType(L, ConsoleHandleType, cons_methods);
+  lua_createtable(L, 0, sizeof(cons_functions)/sizeof(luaL_Reg) - 1);
+  lua_pushvalue(L, -2);
+  luaL_setfuncs(L, cons_functions, 1);
+#endif
   return 1;
 }

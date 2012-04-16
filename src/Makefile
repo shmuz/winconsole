@@ -1,9 +1,15 @@
 # Start of user configuration 
 #------------------------------------------
-LUAINC   = s:\progr\work\system\include
-LUADLL   = c:\exe\lua5.1.dll
-LUAEXE   = lua.exe
-WINCON_H = c:\dev-cpp\include\wincon.h
+ifeq ($(LUAVERSION),52)
+  LUAINC = s:\progr\work\system\include\lua52
+  LUADLL = c:\exe32\lua52.dll
+  LUAEXE = lua52.exe
+else
+  LUAINC = s:\progr\work\system\include\lua51
+  LUADLL = c:\exe32\lua5.1.dll
+  LUAEXE = lua.exe
+endif
+WINCON_H = c:\mingw32\include\wincon.h
 #------------------------------------------
 # End of user configuration
 
@@ -27,7 +33,7 @@ $(BIN): $(OBJ) $(DEF)
 $(DEF):
 	$(LUAEXE) -e"print('EXPORTS\n\tluaopen_$(PROJECT)')" > $@
 
-flags.c: makeflags.lua
-	$(LUAEXE) $< $(WINCON_H) > $@
+flags.c: $(WINCON_H) makeflags.lua
+	$(LUAEXE) makeflags.lua $(WINCON_H) > $@
 
 # End of Makefile
